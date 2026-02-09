@@ -142,9 +142,24 @@ export async function POST(request: NextRequest) {
     } satisfies ClassifyResponse);
   } catch (error) {
     console.error("Classification error:", error);
-    return NextResponse.json(
-      { error: "Failed to classify document" },
-      { status: 500 }
-    );
+
+    // Surface specific error messages for common issues
+    let message = "Failed to classify document";
+    let status = 500;
+
+    if (error instanceof Error) {
+      if (error.message.includes("401")) {
+        message = "Invalid API key. Check your ANTHROPIC_API_KEY in .env.local";
+        status = 401;
+      } else if (error.message.includes("429")) {
+        message = "Rate limited. Please wait a moment and try again.";
+        status = 429;
+      } else if (error.message.includes("413") || error.message.includes("too large")) {
+        message = "File too large for API processing. Try a smaller file.";
+        status = 413;
+      }
+    }
+
+    return NextResponse.json({ error: message }, { status });
   }
 }
