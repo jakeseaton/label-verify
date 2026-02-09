@@ -1,10 +1,12 @@
 "use client";
 
-import { ProcessedFile } from "@/lib/types";
+import { ProcessedFile, FileClassification } from "@/lib/types";
 import { useState } from "react";
 
 interface FileCardProps {
   file: ProcessedFile;
+  onReclassify?: (fileId: string, newClassification: FileClassification) => void;
+  onRetry?: (fileId: string) => void;
 }
 
 const classificationColors = {
@@ -38,11 +40,21 @@ const statusIcons = {
   ),
 };
 
-export default function FileCard({ file }: FileCardProps) {
+export default function FileCard({ file, onReclassify, onRetry }: FileCardProps) {
   const [expanded, setExpanded] = useState(false);
   const colors = classificationColors[file.classification] || classificationColors.unrecognized;
   const fields = file.extractedFields;
   const hasFields = Object.values(fields).some((v) => v);
+
+  const handleReclassify = (e: React.MouseEvent, newClass: FileClassification) => {
+    e.stopPropagation();
+    onReclassify?.(file.id, newClass);
+  };
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRetry?.(file.id);
+  };
 
   return (
     <div className={`rounded-xl border ${colors.border} ${colors.bg} transition-all duration-200`}>
@@ -60,39 +72,70 @@ export default function FileCard({ file }: FileCardProps) {
             </div>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={file.previewUrl}
-              alt={file.file.name}
-              className="w-full h-full object-cover"
-            />
+            <img src={file.previewUrl} alt={file.file.name} className="w-full h-full object-cover" />
           )}
         </div>
 
         {/* File info */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800 truncate">
-            {file.file.name}
-          </p>
-          <div className="flex items-center gap-2 mt-1">
+          <p className="text-sm font-medium text-gray-800 truncate">{file.file.name}</p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {statusIcons[file.status]}
             {file.status === "extracted" ? (
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors.badge} ${colors.text}`}>
-                {file.classification === "label"
-                  ? "Label"
-                  : file.classification === "application"
-                  ? "Application"
-                  : "⚠ Unrecognized"}
-              </span>
+              <>
+                {/* Classification badge — clickable to toggle */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next: FileClassification =
+                      file.classification === "label" ? "application"
+                        : file.classification === "application" ? "label"
+                        : "label";
+                    onReclassify?.(file.id, next);
+                  }}
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors.badge} ${colors.text} hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 transition-all cursor-pointer`}
+                  title="Click to reclassify"
+                >
+                  {file.classification === "label"
+                    ? "Label"
+                    : file.classification === "application"
+                    ? "Application"
+                    : "⚠ Unrecognized"}
+                </button>
+                {/* Reclassify options for unrecognized */}
+                {file.classification === "unrecognized" && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={(e) => handleReclassify(e, "label")}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                    >
+                      → Label
+                    </button>
+                    <button
+                      onClick={(e) => handleReclassify(e, "application")}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                    >
+                      → Application
+                    </button>
+                  </div>
+                )}
+                <span className="text-xs text-gray-400">
+                  {Math.round(file.confidence * 100)}%
+                </span>
+              </>
             ) : file.status === "error" ? (
-              <span className="text-xs text-red-600">{file.error || "Processing failed"}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-red-600">{file.error || "Processing failed"}</span>
+                <button
+                  onClick={handleRetry}
+                  className="text-[10px] px-2 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors font-medium"
+                >
+                  Retry
+                </button>
+              </div>
             ) : (
               <span className="text-xs text-gray-500">
                 {file.status === "uploading" ? "Uploading..." : "Classifying..."}
-              </span>
-            )}
-            {file.status === "extracted" && (
-              <span className="text-xs text-gray-400">
-                {Math.round(file.confidence * 100)}% confidence
               </span>
             )}
           </div>
@@ -116,30 +159,14 @@ export default function FileCard({ file }: FileCardProps) {
       {expanded && hasFields && (
         <div className="px-4 pb-4 pt-1 border-t border-gray-200/50">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {fields.brandName && (
-              <FieldRow label="Brand Name" value={fields.brandName} />
-            )}
-            {fields.classType && (
-              <FieldRow label="Class / Type" value={fields.classType} />
-            )}
-            {fields.abv && (
-              <FieldRow label="ABV" value={fields.abv} />
-            )}
-            {fields.netContents && (
-              <FieldRow label="Net Contents" value={fields.netContents} />
-            )}
-            {fields.beverageType && (
-              <FieldRow label="Beverage Type" value={fields.beverageType} />
-            )}
-            {fields.producerName && (
-              <FieldRow label="Producer" value={fields.producerName} />
-            )}
-            {fields.producerAddress && (
-              <FieldRow label="Address" value={fields.producerAddress} />
-            )}
-            {fields.countryOfOrigin && (
-              <FieldRow label="Origin" value={fields.countryOfOrigin} />
-            )}
+            {fields.brandName && <FieldRow label="Brand Name" value={fields.brandName} />}
+            {fields.classType && <FieldRow label="Class / Type" value={fields.classType} />}
+            {fields.abv && <FieldRow label="ABV" value={fields.abv} />}
+            {fields.netContents && <FieldRow label="Net Contents" value={fields.netContents} />}
+            {fields.beverageType && <FieldRow label="Beverage Type" value={fields.beverageType} />}
+            {fields.producerName && <FieldRow label="Producer" value={fields.producerName} />}
+            {fields.producerAddress && <FieldRow label="Address" value={fields.producerAddress} />}
+            {fields.countryOfOrigin && <FieldRow label="Origin" value={fields.countryOfOrigin} />}
             {fields.governmentWarning && (
               <div className="col-span-full">
                 <FieldRow label="Gov. Warning" value={fields.governmentWarning} />
@@ -155,9 +182,7 @@ export default function FileCard({ file }: FileCardProps) {
 function FieldRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-white/60 rounded-lg px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">
-        {label}
-      </p>
+      <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{label}</p>
       <p className="text-sm text-gray-800 mt-0.5 break-words">{value}</p>
     </div>
   );

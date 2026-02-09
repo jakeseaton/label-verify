@@ -1,64 +1,81 @@
 # TTB Label Verification
 
-AI-powered alcohol label compliance verification tool. Upload label images and COLA application documents — the system classifies each file, extracts structured data, and (in future phases) automatically matches and verifies label-application pairs.
+AI-powered alcohol label compliance verification tool for the Alcohol and Tobacco Tax and Trade Bureau. Upload label images and COLA application documents — the system classifies, matches pairs, and verifies field-by-field compliance automatically.
 
-## Current Status: Phase 1
+## Current Status: Phase 3 Complete
 
-**Working features:**
-- Unified drag-and-drop upload zone (accepts any number of files)
-- AI-powered file classification (label vs. COLA application) via Claude Vision
-- Structured data extraction (brand name, ABV, class/type, net contents, producer info, government warning, etc.)
-- Real-time processing status with progress indicators
-- Expandable file cards showing extracted fields
-- Summary bar with classification counts
+### Features
+- **Unified drag-and-drop upload** — drop 1 to 300+ files (labels and applications, any mix)
+- **AI classification & extraction** — Claude Vision identifies each file and extracts structured data
+- **Automatic pair matching** — labels matched to applications by brand name (fuzzy), ABV, class/type, net contents
+- **Field-by-field verification** with traffic-light status (green/yellow/red/gray)
+- **Government warning deep verification** — exact statutory text match, detects title case, truncation, altered wording
+- **Parallel processing** with configurable concurrency (5 concurrent API calls)
+- **Four-stage progress visualization** — Classifying → Extracting → Matching → Verifying
+- **Manual override controls** — click classification badge to reclassify, retry failed files
+- **CSV export** of verification results
+- **Severity-sorted results** — unmatched → fail → needs review → pass
+- **Filter chips** to show only specific result types
+- **Retry with auto-retry** — failed API calls retry once automatically, plus manual retry button
+- **30-second timeout** per API call to prevent hanging
+
+### Matching Rules
+| Field | Strategy |
+|-------|----------|
+| Brand Name | Fuzzy, case-insensitive; case-only differences = yellow |
+| Class/Type | Case-insensitive; partial containment = yellow |
+| ABV | Numeric extraction; format differences with same value = green |
+| Net Contents | Numeric extraction with unit normalization |
+| Gov. Warning | Exact match against statutory text; zero tolerance |
+| Producer | Fuzzy string matching |
+| Country of Origin | Normalized (strips "Product of", "Made in", etc.) |
 
 ## Setup
-
-### Prerequisites
-- Node.js 18+
-- An Anthropic API key ([get one here](https://console.anthropic.com/))
-
-### Install & Run
 
 ```bash
 npm install
 cp .env.example .env.local
-# Edit .env.local and add your ANTHROPIC_API_KEY
+# Add your ANTHROPIC_API_KEY to .env.local
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Tech Stack
-
-- **Frontend:** Next.js 15 (App Router) + React + Tailwind CSS
-- **Backend:** Next.js API Routes
-- **AI:** Claude API (Anthropic) — Vision for classification + extraction
-- **Hosting:** Vercel (prototype) — would migrate to Azure for production
-
 ## Test Data
 
-The `/test_data` directory contains 10 pairs of test files (10 label PNGs + 10 COLA application PDFs) covering various scenarios including clean matches, ABV mismatches, government warning violations, and brand name case variations. See the Test Case Index PDF for details.
+The `test_data/` directory contains 10 pairs of test files (10 label PNGs + 10 COLA application PDFs) covering clean matches, ABV mismatches, gov warning violations, brand name case variations, and more.
 
 ## Architecture
 
 ```
 src/
 ├── app/
-│   ├── api/classify/route.ts   # Claude Vision API endpoint
-│   ├── layout.tsx               # Root layout
-│   ├── page.tsx                 # Main page (unified upload)
-│   └── globals.css              # Tailwind CSS
+│   ├── api/classify/route.ts   # Claude Vision API (classification + extraction)
+│   ├── layout.tsx
+│   ├── page.tsx                 # Main page (upload → progress → results)
+│   └── globals.css
 ├── components/
 │   ├── DropZone.tsx             # Drag-and-drop file upload
-│   ├── FileCard.tsx             # Per-file classification + extraction display
-│   └── SummaryBar.tsx           # File count summary
+│   ├── FileCard.tsx             # Per-file card with reclassify + retry
+│   ├── PairCard.tsx             # Matched pair with field-by-field verification
+│   ├── ProgressPipeline.tsx     # Four-stage progress visualization
+│   ├── ResultsSummary.tsx       # Summary bar with filters + CSV export
+│   └── SummaryBar.tsx           # File classification counts
 └── lib/
-    └── types.ts                 # Shared TypeScript types
+    ├── csv-export.ts            # CSV generation and download
+    ├── matcher.ts               # Pair matching engine
+    ├── parallel.ts              # Concurrency-limited parallel processor
+    ├── types.ts                 # Shared TypeScript types
+    └── verify.ts                # Field-by-field verification engine
 ```
+
+## Tech Stack
+
+- **Frontend:** Next.js 15 (App Router) + React + Tailwind CSS
+- **Backend:** Next.js API Routes
+- **AI:** Claude Sonnet (Anthropic) — Vision for classification + extraction
+- **Hosting:** Vercel free tier (prototype); migrates to Azure for production
 
 ## Roadmap
 
-- **Phase 2:** Pair matching + verification engine (auto-match labels to applications, field-by-field comparison, traffic-light results)
-- **Phase 3:** Batch scaling + UX polish (parallel processing, progress viz, CSV export, manual overrides)
-- **Phase 4:** Testing, deploy to Vercel, documentation
+- **Phase 4:** Testing with sample labels, final UX polish, deploy to Vercel, documentation
